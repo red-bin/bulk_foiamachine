@@ -1,5 +1,5 @@
 # bulk_foiamachine
-
+```
 ./submit_foia --help
 Uses some silly screenscraping to submit a FOIA request.
 
@@ -13,3 +13,4 @@ Options:
   -j, --jurisdiction=<s>    Jurisdiction to send to.
   -a, --agency=<s>          Agency to send to.
   -f, --force               Send without asking.
+  ```
