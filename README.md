@@ -1,12 +1,12 @@
 # bulk_foiamachine
 
-Screenscraping tool with very little validation to submit FOIA requests. 
+Screenscraping tool with very little validation to submit FOIA requests. This was used to send a request to all states' AG offices.
 
 Requires a file at ~/.foiamachine in the format of:
 
 ```
-user:
-pass:
+user:username
+pass:password
 ```
 
 Usage
