@@ -1,4 +1,15 @@
 # bulk_foiamachine
+
+Screenscraping tool with very little validation to submit FOIA requests. 
+
+Requires a file at ~/.foiamachine in the format of:
+
+```
+user:
+pass:
+```
+
+Usage
 ```
 ./submit_foia --help
 Uses some silly screenscraping to submit a FOIA request.
