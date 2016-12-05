@@ -2,7 +2,7 @@
 
 Screenscraping tool with very little validation to submit FOIA requests. This was used to send a request to all states' AG offices.
 
-Requires a file at ~/.foiamachine in the format of:
+Requires a file at ~/.foiamachine (chmod 600 it) in the format of:
 
 ```
 user:username
