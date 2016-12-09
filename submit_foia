@@ -17,20 +17,26 @@ Options:
 import selenium
 import os
 import time
+import re
 
 from datetime import datetime
 from docopt import docopt
+from gmail import GMail,Message
 from pprint import pprint
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 
+#washington is missing from jurisdiction list and new jersey does not accept email. 
+#Need to fix this soon.
+
 states = ["Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut",
-        "Delaware","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa",
-        "Kansas","Kentucky","Louisiana","Maine","Maryland","Massachusetts","Michigan",
-        "Minnesota","Mississippi","Missouri","Montana","Nebraska","Nevada","New Hampshire",
-        "New Jersey","New Mexico","New York","North Carolina","North Dakota","Ohio","Oklahoma",
-        "Oregon","Pennsylvania","Rhode Island","South Carolina","South Dakota","Tennessee","Texas",
-        "Utah","Vermont","Virginia","Washington","West Virginia","Wisconsin","Wyoming"]
+          "Delaware","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa",
+          "Kansas","Kentucky","Louisiana","Maine","Maryland","Massachusetts","Michigan",
+          "Minnesota","Mississippi","Missouri","Montana",
+          "Nebraska","Nevada","New Hampshire",
+          "New Mexico","New York","North Carolina","North Dakota","Ohio","Oklahoma",
+          "Oregon","Pennsylvania","Rhode Island","South Carolina","South Dakota","Tennessee","Texas",
+          "Utah","Vermont","Virginia","West Virginia","Wisconsin","Wyoming"]
 
 def get_auth(authpath="%s/.foiamachine" % os.environ['HOME']):
     fh = open(authpath, 'r')
@@ -50,32 +56,34 @@ def login(driver, username, password):
     pass_elem.send_keys(Keys.RETURN)
     time.sleep(3)
 
-def create_request(driver, title, request_language, jurisdiction, agency, do_force=False):
-    driver.get("https://beta.foiamachine.org/foi/create/")
-
+def fill_title(driver, title):
     title_elem = driver.find_element_by_name("title")
     title_elem.send_keys(title)
 
+def fill_body(driver, request_language):
     text_elem = driver.find_element_by_name("request_language")
     text_elem.send_keys(request_language)
 
+def fill_juris(driver, jurisdiction):
     juris_elem = driver.find_element_by_name("jurisdiction-autocomplete")
     juris_elem.send_keys(jurisdiction)
-    time.sleep(1)
 
+    time.sleep(2) #Wait for response. fix this.
     juris_selector = driver.find_element_by_css_selector("body > span")
     juris_index = juris_selector.text.splitlines().index(jurisdiction) + 1
 
     juris_itm =  driver.find_element_by_css_selector("body > span > span:nth-child(%s)" % juris_index)
     juris_itm.click()
 
+def fill_agency(driver, agency):
     agency_elem = driver.find_element_by_name("agency-autocomplete")
     agency_elem.send_keys(agency)
-    time.sleep(1)
+    time.sleep(2)
 
     agency_itm = driver.find_element_by_css_selector("body > span:nth-child(6) > span:nth-child(1)")
     agency_itm.click()
 
+def submit(driver, do_force=False):
     button = driver.find_element_by_css_selector("body > main > form > button")
 
     if do_force:
@@ -84,7 +92,45 @@ def create_request(driver, title, request_language, jurisdiction, agency, do_for
         do_send = raw_input("y or n ")
         if do_send == "y":
             button.click()
-            time.sleep(2)
+
+def request_email_addr(driver):
+    to_selector = "#communications > div > header > table > tbody > tr:nth-child(1) > td:nth-child(2)"   
+    to_elem = driver.find_element_by_css_selector(to_selector)
+    to_address = re.split('[<>]', to_elem.text)[-2]
+    return to_address
+
+def request_body(driver):
+    body_selector = "#communications > div > div"
+    body_elem = driver.find_element_by_css_selector(body_selector)
+    body_text = body_elem.text.replace('\n','\n\n')
+    return body_text
+
+def request_info(driver, url=None):
+    if url:
+        driver.get(url)
+
+    to_address = request_email_addr(driver)
+    body_text = request_body(driver)
+
+    return to_address, body_text
+
+def create_request(driver, title, request_language, jurisdiction, agency, do_force=False):
+    driver.get("https://beta.foiamachine.org/foi/create/")
+
+    fill_title(driver, title)
+    fill_body(driver, request_language)
+    fill_juris(driver, jurisdiction)
+    fill_agency(driver, agency)
+    submit(driver, do_force)
+
+    request_url = driver.current_url
+
+    return request_url
+
+def send_email(gmail_handle, to, title, text):
+    msg = Message(title, to=to, text=text)
+    result = gmail_handle.send(msg)
+    print "Sent to %s " % to
 
 def parse_args(args):
     agency = args['--agency']
@@ -98,12 +144,18 @@ def parse_args(args):
 
     return title, body, jurisdictions, agency, do_force
 
-title, body, jurisdictions, agency, do_force = parse_args(docopt(__doc__))
+if __name__ == "__main__":
+    title, body, jurisdictions, agency, do_force = parse_args(docopt(__doc__))
 
-driver = webdriver.Chrome()
+    driver = webdriver.Chrome()
+    gmail_handle = GMail(authdict['mail_user'],authdict['mail_pass'])
+    authdict = get_auth()
 
-authdict = get_auth()
-login(driver, username=authdict['user'], password=authdict['pass'])
+    login(driver, username=authdict['user'], password=authdict['pass'])
 
-for juris in jurisdictions:
-    create_request(driver, title, body, juris, agency, do_force)
+    for juris in jurisdictions:
+        print "Creating for %s " % juris
+        request_url = create_request(driver, title, body, juris, agency, do_force)
+        email_addr, email_body = request_info(driver, request_url)
+        send_email(gmail_handle, to=email_addr, title=title, text=email_body)
+        print
